@@ -21,7 +21,7 @@ interface DecodedToken extends JwtPayload {
 
 export const auth = async (req:Request, res: Response, next: NextFunction ) => {
     try {
-        const authHeader = req.headers['Authorization'];
+        const authHeader = req.header('Authorization') || req.headers.authorization;
 
         if (!authHeader || typeof authHeader !== "string" || !authHeader.startsWith("Bearer ")) {
             return res.status(401).json({
@@ -32,7 +32,7 @@ export const auth = async (req:Request, res: Response, next: NextFunction ) => {
 
         const token = authHeader!.substring(7);
 
-        const decoded = jwt.verify(token, process.env.JWt_SECRET as string) as unknown as DecodedToken;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as DecodedToken;
 
         const user = await User.findById(decoded.userId).select('email');
 
@@ -65,7 +65,7 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
         const authHeader = req.header('Authorization');
         if (authHeader && authHeader.startsWith('Bearer ')) {
             const token = authHeader.substring(7);
-            const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+            const decoded = jwt.verify(token, process.env.JWT_SECRET!) as DecodedToken;
             const user = await User.findById(decoded.userId).select('email');
             
             if (user) {

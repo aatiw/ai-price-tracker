@@ -12,6 +12,6 @@ router.post('/login', authRateLimit, validate(loginSchema), authController.login
 // forgot password;
 
 router.get("/me", auth, authController.getMe);
-router.put('profile', auth, authController.updateProfile);
+router.put('/profile', auth, authController.updateProfile);
 
 export default router;

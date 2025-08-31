@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import "dotenv/config";
+
 
 const connectDb = async(): Promise<void> => {
     try {

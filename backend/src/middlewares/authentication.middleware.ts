@@ -32,7 +32,7 @@ export const auth = async (req:Request, res: Response, next: NextFunction ) => {
 
         const token = authHeader!.substring(7);
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as unknown as DecodedToken;
+        const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as unknown as DecodedToken;
 
         const user = await User.findById(decoded.userId).select('email');
 
@@ -54,7 +54,7 @@ export const auth = async (req:Request, res: Response, next: NextFunction ) => {
             return res.status(401).json({ success: false, message: 'Token has expired'})
         }
         if(error.name === 'JsonWebTokenError'){
-            return res.status(401).json({ success: false, message: ' token in not value'})
+            return res.status(401).json({ success: false, message: ' token in not valid'})
         }
         next(error);
     }
@@ -65,7 +65,7 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
         const authHeader = req.header('Authorization');
         if (authHeader && authHeader.startsWith('Bearer ')) {
             const token = authHeader.substring(7);
-            const decoded = jwt.verify(token, process.env.JWT_SECRET!) as DecodedToken;
+            const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET!) as DecodedToken;
             const user = await User.findById(decoded.userId).select('email');
             
             if (user) {
@@ -76,7 +76,6 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
             }
         }
     } catch (error) {
-        // If token is expired or invalid, we don't care. Just proceed without a user.
     }
     next();
 };

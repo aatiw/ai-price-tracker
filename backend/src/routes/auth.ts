@@ -8,6 +8,7 @@ const router = express.Router();
 
 router.post('/signup', authRateLimit, validate(signupSchema), authController.signup);
 router.post('/login', authRateLimit, validate(loginSchema), authController.login);
+router.post('/logout', auth, authController.logout);
 
 // forgot password;
 

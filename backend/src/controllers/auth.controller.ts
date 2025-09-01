@@ -3,27 +3,34 @@ import jwt from "jsonwebtoken";
 import type { Request, Response, NextFunction } from "express";
 import { User } from "../models/User.js";
 import "dotenv/config";
+import redis from "../config/redisConfig.js";
 
 
 const router = express.Router();
 
 const generateAccessToken = (userId: string): string => {
     if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET environment variable not set.");
-    return jwt.sign({ userId }, process.env.JWT_SECRET, {
+    return jwt.sign({ userId }, process.env.JWT_ACCESS_SECRET!, {
         expiresIn: '15m'
     });
 };
 
 const generateRefreshToken = (userId: string): string => {
     if(!process.env.JWT_SECRET) throw new Error("JWT_SECRET not set");
-    return jwt.sign({userId}, process.env.JWT_SECRET!, {
+    return jwt.sign({userId}, process.env.JWT_REFRESH_SECRET!, {
         expiresIn: '3d'
     });
 };
 
-const sendTokens = (res: Response, User: any) => {
-    const accessToken = generateAccessToken(User._id.toString());
-    const refreshToken = generateRefreshToken(User._id.toString());
+const storeRefreshToken = async (userId: string, token: string) => {
+  await redis.set(`refresh:${userId}`, token, "EX", 3*24*60*60*1000);
+};
+
+const sendTokens = (res: Response, user: any) => {
+    const accessToken = generateAccessToken(user._id.toString());
+    const refreshToken = generateRefreshToken(user._id.toString());
+
+    storeRefreshToken(user._id.toString(), refreshToken);
 
     res.cookie('refreshToken', refreshToken, {
         httpOnly: true,
@@ -36,10 +43,10 @@ const sendTokens = (res: Response, User: any) => {
         success: true,
         accessToken,
         user: {
-            id: User._id,
-            name: User.name,
-            email: User.email,
-            authProviders: User.authProviders
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            authProviders: user.authProviders
         }
     });
 };
@@ -117,17 +124,40 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
             return res.status(401).json({success: false, message: 'noe refresh token provided'});
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {userId: string};
+        const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET!) as {userId: string};
+        
+        const storedToken = await redis.get(`refresh:${decoded.userId}`);
+        if (!storedToken || storedToken !== token) {
+            return res.status(401).json({ success: false, message: "Invalid or expired refresh token" });
+        }
         const user = await User.findById(decoded.userId);
         if(!user) {
             return res.status(401).json({ success: false, message: 'Invalid refresh token'});
         }
-        sendTokens(res, user);
+        await sendTokens(res, user);
     } catch (error) {
         next(error);
         console.log("error in refreshtoken auth.controller.ts");
     }
 }
+
+export const logout = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.cookies.refreshToken;
+    if (token) {
+      const decoded = jwt.decode(token) as { userId: string };
+      if (decoded?.userId) {
+        await redis.del(`refresh:${decoded.userId}`);
+      }
+    }
+
+    res.clearCookie("refreshToken");
+    res.json({ success: true, message: "Logged out successfully" });
+  } catch (error) {
+    next(error);
+    console.error("error in logout:", error);
+  }
+};
 
 export const getMe = async (req: Request, res: Response, next: NextFunction) => {
     try {

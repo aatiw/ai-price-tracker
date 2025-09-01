@@ -14,6 +14,8 @@ interface userI extends Document {
     lastLogin: Date;
     createdAt: Date;
     updatedAt: Date;
+    searchCount: number;
+    searchLimitResetsAt?: Date | null;
 
     comparePasswords(candidatePassword: string): Promise<boolean>;
 };
@@ -34,7 +36,14 @@ const userSchema = new  Schema<userI>({
     },
     resetPasswordExpires: Date,
     resetPasswordToken: String,
-    lastLogin: {type: Date}
+    lastLogin: {type: Date},
+    searchCount: {
+        type: Number,
+        default: 0
+    },
+    searchLimitResetsAt: {
+        type: Date
+    }
 },{
     timestamps: true,
     toJSON: {transform:(doc, ret) => {

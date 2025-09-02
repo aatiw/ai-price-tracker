@@ -27,7 +27,7 @@ export const searchAndAnalyze = async (query: string, userId: string) => {
 
     const workflowResult = await aiWorkflow.executeWorkflow(query, userId);
 
-    const results = Array.from(workflowResult.scrapedData.entries()).map(([platform, data]) => ({
+    const results = Array.from(workflowResult.scrapedData.entries() as Iterable<[string, any]>).map(([platform, data]) => ({
         platform,
         url: data.url || `https://${platform}.com/search?q=${encodeURIComponent(query)}`,
         price: data.price || 0,

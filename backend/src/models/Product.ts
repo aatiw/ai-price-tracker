@@ -41,6 +41,9 @@ interface ProductI extends Document{
     }
 
     notes?: string;
+    asin: string,
+    bullets: [string],
+    description: string,
     createdAt: Date;
     updatedAt: Date;
 }
@@ -49,7 +52,7 @@ const ProductSchema = new Schema<ProductI>({
     title: {type: String, required: true, trim: true},
     brand: String,
     category: String,
-    image: [String],
+    image: {type: [String], default: []},
 
     masterProductId: {
         type: String,
@@ -87,7 +90,10 @@ const ProductSchema = new Schema<ProductI>({
         historicalDataSource: String
     },
 
-    notes: String
+    notes: String,
+    asin: String,
+    bullets: [String],
+    description: String,
 }, {timestamps: true});
 
 

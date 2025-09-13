@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getConfiguredAI, makeStreamingRequest, rateLimiter } from '../config/geminiConfig.js';
 
 interface ProductDetails {
   title: string;
@@ -38,12 +38,31 @@ interface PricePrediction {
 }
 
 export class ProductIntelligenceService {
-  private genAI: GoogleGenerativeAI;
-  private model: any;
+  private ai: any;
+  private model: string;
+  private config: any;
 
   constructor() {
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    this.model = this.genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const { ai, config, model } = getConfiguredAI();
+    this.ai = ai;
+    this.config = config;
+    this.model = model;
+  }
+
+  private async makeGeminiRequest(prompt: string): Promise<string> {
+    if (!rateLimiter.canMakeRequest()) {
+      throw new Error('Rate limit exceeded. Remaining: ' + JSON.stringify(rateLimiter.getRemainingRequests()));
+    }
+    rateLimiter.recordRequest();
+
+    const contents = [
+      {
+        role: 'user',
+        parts: [{ text: prompt }],
+      },
+    ];
+
+    return makeStreamingRequest(this.ai, this.model, this.config, contents);
   }
 
   async searchProductsAcrossPlatforms(query: string): Promise<ProductDetails[]> {
@@ -93,11 +112,7 @@ export class ProductIntelligenceService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text().trim();
-
-      
+      const text = await this.makeGeminiRequest(prompt);
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       if (!jsonMatch) {
         throw new Error("No valid JSON found in response");
@@ -146,7 +161,7 @@ export class ProductIntelligenceService {
       "averagePrice": 1750,
       "priceRange": {"min": 1299, "max": 2199},
       "bestDeal": {"platform": "flipkart", "price": 1299, "reason": "Lowest price with good seller rating"},
-      "EMI": {"platform": "amazon", "reason": "ICICI bank is offering this service as mention in the offers section"}
+      "EMI": {"platform": "amazon", "reason": "ICICI bank is offering this service as mentioned in the offers section"}
       "marketTrend": "falling",
       "recommendedAction": "buy_now",
       "confidence": 85,
@@ -155,11 +170,9 @@ export class ProductIntelligenceService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text().trim();
+      const result = await this.makeGeminiRequest(prompt);
 
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         return this.getFallbackAnalysis(products);
       }
@@ -205,11 +218,9 @@ export class ProductIntelligenceService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text().trim();
+      const result = await this.makeGeminiRequest(prompt);
 
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         return this.getFallbackPrediction(products);
       }
@@ -250,11 +261,9 @@ export class ProductIntelligenceService {
     `;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text().trim();
-
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      const result = await this.makeGeminiRequest(prompt);
+      
+      const jsonMatch = result.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         return null;
       }
@@ -262,7 +271,7 @@ export class ProductIntelligenceService {
       const product: ProductDetails = JSON.parse(jsonMatch[0]);
       return { ...product, platform, url };
     } catch (error) {
-      console.error("Error extracting product from URL:", error);
+      console.error('Error extracting product from URL:', error);
       return null;
     }
   }
@@ -325,17 +334,13 @@ export class ProductIntelligenceService {
   }
 
   private getFallbackPrediction(products: ProductDetails[]): PricePrediction {
-    const avgPrice =
-      products.reduce((sum, p) => sum + p.price, 0) / products.length;
-
+    const avgPrice = products.reduce((sum, p) => sum + p.price, 0) / products.length;
+    
     return {
-      nextMonthRange: {
-        min: Math.round(avgPrice * 0.8),
-        max: Math.round(avgPrice * 1.2),
-      },
+      nextMonthRange: { min: Math.round(avgPrice * 0.8), max: Math.round(avgPrice * 1.2) },
       confidence: 40,
-      factors: ["Limited historical data", "Market volatility"],
-      bestTimeToBuy: "Monitor for better data",
+      factors: ['Limited historical data', 'Market volatility'],
+      bestTimeToBuy: 'Monitor for better data'
     };
   }
 }

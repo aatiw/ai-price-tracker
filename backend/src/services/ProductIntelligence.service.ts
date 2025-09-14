@@ -1,6 +1,6 @@
 import { getConfiguredAI, makeStreamingRequest, rateLimiter } from '../config/geminiConfig.js';
 
-interface ProductDetails {
+export interface ProductDetails {
   title: string;
   brand?: string;
   category?: string;
@@ -19,7 +19,16 @@ interface ProductDetails {
   specifications?: Record<string, string>;
 }
 
-interface MarketAnalysis {
+export interface Recommendation {
+  action: "buy_now" | "wait" | "monitor";
+  rationale: string;
+  confidence: number;
+  targetPrice?: number;
+  platform?: string;
+  timeFrame?: string;
+}
+
+export interface MarketAnalysis {
   averagePrice: number;
   priceRange: { min: number; max: number };
   bestDeal: { platform: string; price: number; reason: string };
@@ -30,7 +39,7 @@ interface MarketAnalysis {
   insights: string[];
 }
 
-interface PricePrediction {
+export interface PricePrediction {
   nextMonthRange: { min: number; max: number };
   confidence: number;
   factors: string[];
